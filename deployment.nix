@@ -12,11 +12,20 @@
 
   flow = {
     package = "/nix/store/fx97zi3zql2rm1s5xpllx1dbdfd3axdc-flow-nexus-v1";
-    pair = "/nix/store/fx97zi3zql2rm1s5xpllx1dbdfd3axdc-flow-nexus-v1/bin/flow-pair";
     pairExecutable = "/nix/store/ykc19hndw3rjhcrvm06xqqzlxc2lwjq5-flow-nexus-engines-1.0.0/libexec/flow-pair-engine";
     daemonExecutable = "/nix/store/i3cijwhxx6jb86iw2zsk1x60764b5y1h-flow-nexus-daemon-1.0.0/bin/flow-nexus-daemon";
     translatorExecutable = "/nix/store/srqgh07cz5mffkwzk86k4g14qdvsj9ap-flow-nexus-translator-1.0.0/bin/flow-nexus-translator";
     cli = "/nix/store/fx97zi3zql2rm1s5xpllx1dbdfd3axdc-flow-nexus-v1/bin/flow-nexus";
+    admission = {
+      timeoutMilliseconds = 70000;
+      frameCapacityBytes = 8388608;
+      attempts = 25;
+    };
+    textBudget = {
+      nodeLimit = 1048576;
+      depthLimit = 64;
+    };
+    trustedCodexPaths = [];
     sockets = [ "flow.sock" "flow-translator.sock" ];
     readyDatom = "Definitions";
   };
