@@ -6,6 +6,7 @@ import socket
 import shutil
 import subprocess
 import tempfile
+import threading
 import time
 import unittest
 from unittest import mock
@@ -46,6 +47,58 @@ class MetaflowTests(unittest.TestCase):
                 composition.prepare_paths()
             self.assertEqual(sentinel.read_text(), "keep")
             self.assertFalse(composition.state.exists())
+
+
+
+    def test_preexisting_empty_runtime_is_stale_and_refused(self):
+        with tempfile.TemporaryDirectory() as root:
+            composition = self.make(root)
+            composition.runtime.mkdir(parents=True)
+            with self.assertRaisesRegex(metaflow.CompositionError, "runtime path conflict"):
+                composition.prepare_paths()
+            composition.cleanup()
+            self.assertTrue(composition.runtime.is_dir())
+
+    def test_cleanup_never_removes_replacement_runtime_directory(self):
+        with tempfile.TemporaryDirectory() as root:
+            composition = self.make(root)
+            composition.prepare_paths()
+            # Simulate an external replacement after the owned directory moved.
+            moved = composition.runtime.with_name("owned-moved")
+            composition.runtime.rename(moved)
+            composition.runtime.mkdir()
+            composition.cleanup()
+            self.assertTrue(composition.runtime.is_dir())
+            self.assertTrue((moved / ".metaflow-owner").is_file())
+
+    def test_concurrent_starters_have_one_owner_and_loser_cleanup_is_rival_safe(self):
+        with tempfile.TemporaryDirectory() as root:
+            first = self.make(root)
+            second = self.make(root)
+            gate = threading.Barrier(3)
+            outcomes = []
+            def claim(composition):
+                gate.wait()
+                try:
+                    composition.prepare_paths()
+                    outcomes.append(("won", composition))
+                except metaflow.CompositionError:
+                    outcomes.append(("lost", composition))
+            threads = [threading.Thread(target=claim, args=(item,)) for item in (first, second)]
+            for thread in threads: thread.start()
+            gate.wait()
+            for thread in threads: thread.join()
+            self.assertEqual(sorted(kind for kind, _ in outcomes), ["lost", "won"])
+            winner = next(item for kind, item in outcomes if kind == "won")
+            loser = next(item for kind, item in outcomes if kind == "lost")
+            rival = winner.runtime / "rival-resource"
+            rival.write_text("keep")
+            loser.cleanup()
+            self.assertEqual(rival.read_text(), "keep")
+            self.assertTrue((winner.runtime / ".metaflow-owner").exists())
+            winner.cleanup()
+            self.assertEqual(rival.read_text(), "keep")
+            self.assertTrue(winner.state.exists())
 
     def test_partial_startup_cleanup_preserves_state_and_unrelated_process(self):
         with tempfile.TemporaryDirectory() as root:

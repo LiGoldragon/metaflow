@@ -100,7 +100,12 @@ class OwnedInode:
             value = self.path.lstat()
         except FileNotFoundError:
             return False
-        right_kind = stat.S_ISSOCK(value.st_mode) if self.kind == "socket" else stat.S_ISREG(value.st_mode)
+        if self.kind == "socket":
+            right_kind = stat.S_ISSOCK(value.st_mode)
+        elif self.kind == "directory":
+            right_kind = stat.S_ISDIR(value.st_mode)
+        else:
+            right_kind = stat.S_ISREG(value.st_mode)
         held = os.fstat(self.handle)
         return (right_kind and (value.st_dev, value.st_ino) == (self.device, self.inode)
                 and (held.st_dev, held.st_ino) == (self.device, self.inode))
@@ -140,6 +145,7 @@ class Composition:
         self.provisionals: list[tuple[subprocess.Popen[bytes], int]] = []
         self.owned_files: list[OwnedInode] = []
         self.created_runtime = False
+        self.runtime_identity: OwnedInode | None = None
         self.stop_requested = False
         self._wake_write: int | None = None
         self._install_paths()
@@ -167,14 +173,16 @@ class Composition:
         return time.monotonic() + float(self.config["startupTimeoutSeconds"])
 
     def prepare_paths(self) -> None:
-        if self.runtime.exists():
-            if not self.runtime.is_dir():
-                raise CompositionError(f"runtime path is not a directory: {self.runtime}")
-            if any(self.runtime.iterdir()):
-                raise CompositionError(f"runtime path conflict: {self.runtime}")
-        else:
-            self.runtime.mkdir(parents=True)
-            self.created_runtime = True
+        # The instance directory itself is the atomic live-instance claim. A
+        # preexisting directory is never adopted, even when empty: its owner or
+        # crash provenance is unknown. State is intentionally outside this claim.
+        self.runtime.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.mkdir(self.runtime, 0o700)
+        except FileExistsError as exc:
+            raise CompositionError(f"runtime path conflict: {self.runtime}") from exc
+        self.created_runtime = True
+        self.runtime_identity = OwnedInode.capture(self.runtime, "directory")
         self.state.mkdir(parents=True, exist_ok=True)
         marker = self.runtime / ".metaflow-owner"
         fd = os.open(marker, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -455,10 +463,13 @@ class Composition:
             for identity in pair.identities():
                 try: os.close(identity.pidfd)
                 except OSError: pass
-        try:
-            self.runtime.rmdir()
-        except OSError:
-            pass
+        if self.created_runtime and self.runtime_identity is not None:
+            if self.runtime_identity.still_same():
+                try:
+                    self.runtime.rmdir()
+                except OSError:
+                    pass
+            self.runtime_identity.close()
 
 
 def load_config(path: str) -> dict:
