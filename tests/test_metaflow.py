@@ -173,12 +173,14 @@ class MetaflowTests(unittest.TestCase):
             with self.assertRaisesRegex(metaflow.CompositionError, "changed"):
                 composition.admit_flow_peer()
             self.assertEqual(calls, [])
-            # Reuse/death observed immediately after the first meta call fails composition.
-            reused = Identity(2); calls = []
-            composition._flow_translator = lambda: reused
-            with self.assertRaisesRegex(metaflow.CompositionError, "changed"):
-                composition.admit_flow_peer()
-            self.assertEqual(len(calls), 1)
+            # Every before/after boundary of both meta admissions revalidates the
+            # same retained lifetime identity. No later admission follows a failure.
+            for fail_at, expected_calls in ((2, 1), (3, 1), (4, 2)):
+                changed = Identity(fail_at); calls = []
+                composition._flow_translator = lambda changed=changed: changed
+                with self.assertRaisesRegex(metaflow.CompositionError, "changed"):
+                    composition.admit_flow_peer()
+                self.assertEqual(len(calls), expected_calls)
 
     def test_early_child_exit_is_detected_without_restart(self):
         proc = subprocess.Popen([shutil.which("sleep"), "30"])
