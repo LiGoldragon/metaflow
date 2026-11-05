@@ -232,6 +232,15 @@ class MetaflowTests(unittest.TestCase):
             with self.assertRaisesRegex(metaflow.CompositionError, "owned process ended"):
                 composition.ready_belief()
 
+    def test_command_launch_failure_is_typed(self):
+        def runner(argv, **kwargs):
+            raise OSError("missing executable")
+        with tempfile.TemporaryDirectory() as root:
+            composition = self.make(root, runner)
+            composition.verify_all = lambda: None
+            with self.assertRaisesRegex(metaflow.CompositionError, "could not start.*missing executable"):
+                composition._command(["missing-cli"])
+
     def test_flow_readiness_requires_typed_definitions_reply(self):
         def runner(argv, **kwargs):
             return subprocess.CompletedProcess(argv, 0, "Success", "")

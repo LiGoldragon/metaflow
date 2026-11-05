@@ -329,6 +329,8 @@ class Composition:
                                  env=self.environ)
         except subprocess.TimeoutExpired as exc:
             raise CompositionError(f"semantic command timed out: {argv[0]}") from exc
+        except OSError as exc:
+            raise CompositionError(f"semantic command could not start: {argv[0]}: {exc}") from exc
         self.verify_all()
         if result.returncode != 0:
             raise CompositionError(f"semantic command failed ({result.returncode}): {result.stderr.strip()}")
