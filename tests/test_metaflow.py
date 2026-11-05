@@ -37,6 +37,13 @@ class MetaflowTests(unittest.TestCase):
                "XDG_STATE_HOME": str(Path(root) / "state")}
         return metaflow.Composition(base_config(root), "test", env, runner)
 
+    def test_place_rejects_both_datom_delimiters_in_paths(self):
+        with tempfile.TemporaryDirectory() as root:
+            env = {"XDG_RUNTIME_DIR": str(Path(root) / "run«bad"),
+                   "XDG_STATE_HOME": str(Path(root) / "state")}
+            with self.assertRaisesRegex(metaflow.CompositionError, "datom delimiters"):
+                metaflow.Composition(base_config(root), "test", env)
+
     def test_path_conflict_refuses_without_changing_contents(self):
         with tempfile.TemporaryDirectory() as root:
             composition = self.make(root)

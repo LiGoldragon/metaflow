@@ -172,8 +172,8 @@ class Composition:
         state_base = self.environ.get(state_variable, str(fallback))
         self.runtime = Path(runtime_base) / self.config["runtimeNamespace"] / self.name
         self.state = Path(state_base) / self.config["stateNamespace"] / self.name
-        if "»" in str(self.runtime) or "»" in str(self.state):
-            raise CompositionError("Place paths cannot contain the datom string terminator")
+        if any(delimiter in str(path) for path in (self.runtime, self.state) for delimiter in ("«", "»")):
+            raise CompositionError("Place paths cannot contain datom delimiters")
         self.place = f"{{ {self.name} «{self.runtime}» «{self.state}» }}"
 
     @property
