@@ -237,7 +237,13 @@ class Composition:
             raise CompositionError(f"ambiguous {role} children beneath {parent.pid}: {candidates}")
         if not candidates:
             return None
-        return ProcessIdentity.capture(role, candidates[0], parent.pid, self.uid, expected_exe)
+        try:
+            return ProcessIdentity.capture(role, candidates[0], parent.pid, self.uid, expected_exe)
+        except (FileNotFoundError, ProcessLookupError):
+            # The child may exit between /proc discovery and pidfd capture.
+            # Treat that observation as absent and let the deadline report a
+            # typed missing-child failure rather than leaking a race exception.
+            return None
 
     def _wait_children(self, name: str, parent: ProcessIdentity, item: dict,
                        deadline: float) -> tuple[ProcessIdentity, ProcessIdentity]:

@@ -182,6 +182,15 @@ class MetaflowTests(unittest.TestCase):
                 with self.assertRaisesRegex(metaflow.CompositionError, "ambiguous"):
                     composition._select_child(parent, "translator", "/x")
 
+    def test_child_exit_during_identity_capture_is_retryable_absence(self):
+        with tempfile.TemporaryDirectory() as root:
+            composition = self.make(root)
+            parent = SimpleNamespace(pid=40)
+            with mock.patch.object(composition, "_children", return_value=[41]), \
+                 mock.patch("metaflow.proc_fields", return_value=(40, 1, os.getuid(), "/x")), \
+                 mock.patch.object(metaflow.ProcessIdentity, "capture", side_effect=ProcessLookupError()):
+                self.assertIsNone(composition._select_child(parent, "translator", "/x"))
+
     def test_daemon_and_translator_must_be_distinct_children(self):
         with tempfile.TemporaryDirectory() as root:
             composition = self.make(root)
