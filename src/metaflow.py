@@ -302,7 +302,13 @@ class Composition:
                                        stderr=subprocess.STDOUT, close_fds=True)
         finally:
             log_file.close()
-        pidfd = os.pidfd_open(process.pid)
+        try:
+            pidfd = os.pidfd_open(process.pid)
+        except ProcessLookupError as exc:
+            # A child can exit before pidfd registration. Reap that exact
+            # subprocess and preserve a typed startup failure.
+            process.wait()
+            raise CompositionError(f"{name} pair exited before identity capture") from exc
         provisional = (process, pidfd)
         self.provisionals.append(provisional)
         deadline = self.startup_deadline

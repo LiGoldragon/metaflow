@@ -194,6 +194,24 @@ class MetaflowTests(unittest.TestCase):
                 with self.assertRaisesRegex(metaflow.CompositionError, "ambiguous"):
                     composition._select_child(parent, "translator", "/x")
 
+    def test_exit_before_pidfd_registration_is_reaped_and_typed(self):
+        with tempfile.TemporaryDirectory() as root:
+            composition = self.make(root)
+            composition.prepare_paths()
+            true = shutil.which("true")
+            composition.config["flow"].update({
+                "pair": true, "pairExecutable": true, "daemonExecutable": true,
+                "translatorExecutable": true, "sockets": [],
+            })
+            process = mock.Mock(pid=1234)
+            process.poll.return_value = 0
+            with mock.patch("metaflow.subprocess.Popen", return_value=process), \
+                 mock.patch("metaflow.os.pidfd_open", side_effect=ProcessLookupError()):
+                with self.assertRaisesRegex(metaflow.CompositionError, "exited before identity capture"):
+                    composition.start_pair("flow")
+            process.wait.assert_called_once_with()
+            composition.cleanup()
+
     def test_child_exit_during_identity_capture_is_retryable_absence(self):
         with tempfile.TemporaryDirectory() as root:
             composition = self.make(root)
