@@ -514,7 +514,11 @@ def main(argv: list[str] | None = None) -> int:
     config_path = os.environ.get("METAFLOW_DEPLOYMENT_CONFIG")
     if not config_path:
         parser.error("METAFLOW_DEPLOYMENT_CONFIG is required; use the Nix package")
-    composition = Composition(load_config(config_path), args.name)
+    try:
+        composition = Composition(load_config(config_path), args.name)
+    except (CompositionError, OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"metaflow: invalid deployment configuration: {exc}", file=sys.stderr)
+        return 1
     signal.signal(signal.SIGINT, composition.request_stop)
     signal.signal(signal.SIGTERM, composition.request_stop)
     try:

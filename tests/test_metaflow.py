@@ -37,6 +37,15 @@ class MetaflowTests(unittest.TestCase):
                "XDG_STATE_HOME": str(Path(root) / "state")}
         return metaflow.Composition(base_config(root), "test", env, runner)
 
+    def test_invalid_deployment_configuration_is_user_facing_error(self):
+        with tempfile.TemporaryDirectory() as root:
+            config = Path(root) / "broken.json"
+            config.write_text("{")
+            with mock.patch.dict(os.environ, {"METAFLOW_DEPLOYMENT_CONFIG": str(config)}), \
+                 mock.patch("sys.stderr", new_callable=__import__("io").StringIO) as stderr:
+                self.assertEqual(metaflow.main(["start", "test"]), 1)
+            self.assertIn("invalid deployment configuration", stderr.getvalue())
+
     def test_place_rejects_both_datom_delimiters_in_paths(self):
         with tempfile.TemporaryDirectory() as root:
             env = {"XDG_RUNTIME_DIR": str(Path(root) / "run«bad"),
