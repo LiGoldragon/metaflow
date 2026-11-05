@@ -195,6 +195,13 @@ class MetaflowTests(unittest.TestCase):
             composition.ready_herdr()
             composition.ready_belief()
 
+    def test_belief_readiness_does_not_hide_owned_process_failure(self):
+        with tempfile.TemporaryDirectory() as root:
+            composition = self.make(root)
+            composition.verify_all = mock.Mock(side_effect=metaflow.CompositionError("owned process ended"))
+            with self.assertRaisesRegex(metaflow.CompositionError, "owned process ended"):
+                composition.ready_belief()
+
     def test_flow_readiness_requires_typed_definitions_reply(self):
         def runner(argv, **kwargs):
             return subprocess.CompletedProcess(argv, 0, "Success", "")

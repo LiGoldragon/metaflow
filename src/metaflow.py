@@ -337,6 +337,10 @@ class Composition:
             try:
                 resolved = self._command([item["cli"], self.name, item["resolveDatom"]])
             except CompositionError:
+                # Readiness refusals are retryable, but ownership failures are
+                # terminal. Re-verify after a failed command so a dead or
+                # replaced pair cannot be hidden until the startup deadline.
+                self.verify_all()
                 resolved = ""
             if resolved.startswith("Resolved."):
                 break
