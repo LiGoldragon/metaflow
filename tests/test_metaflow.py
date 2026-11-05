@@ -182,6 +182,15 @@ class MetaflowTests(unittest.TestCase):
                 with self.assertRaisesRegex(metaflow.CompositionError, "ambiguous"):
                     composition._select_child(parent, "translator", "/x")
 
+    def test_daemon_and_translator_must_be_distinct_children(self):
+        with tempfile.TemporaryDirectory() as root:
+            composition = self.make(root)
+            parent = SimpleNamespace(pid=40, verify=lambda: None)
+            shared = metaflow.ProcessIdentity("daemon", 41, -1, 40, 1, os.getuid(), "/x")
+            with mock.patch.object(composition, "_select_child", side_effect=[shared, shared]):
+                with self.assertRaisesRegex(metaflow.CompositionError, "share pid 41"):
+                    composition._wait_children("flow", parent, {"daemonExecutable": "/x", "translatorExecutable": "/x"}, time.monotonic() + 1)
+
     def test_semantic_readiness_waits_for_typed_replies(self):
         outputs = iter([
             "Configured.One", "Configured.Two.Ready",

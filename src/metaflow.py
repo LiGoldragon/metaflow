@@ -247,6 +247,8 @@ class Composition:
             daemon = daemon or self._select_child(parent, f"{name} daemon", item["daemonExecutable"])
             translator = translator or self._select_child(parent, f"{name} translator", item["translatorExecutable"])
             if daemon and translator:
+                if daemon.pid == translator.pid:
+                    raise CompositionError(f"{name} daemon and translator share pid {daemon.pid}")
                 daemon.verify(); translator.verify(); parent.verify()
                 return daemon, translator
             time.sleep(self._poll_seconds())
