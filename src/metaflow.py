@@ -34,6 +34,12 @@ def proc_fields(pid: int) -> tuple[int, int, int, str]:
     return ppid, starttime, uid, exe
 
 
+def proc_is_zombie(pid: int) -> bool:
+    raw = Path(f"/proc/{pid}/stat").read_text()
+    tail = raw[raw.rfind(")") + 2 :].split()
+    return tail[0] == "Z"
+
+
 @dataclass
 class ProcessIdentity:
     role: str
@@ -63,6 +69,8 @@ class ProcessIdentity:
     def verify(self) -> None:
         try:
             signal.pidfd_send_signal(self.pidfd, 0)
+            if proc_is_zombie(self.pid):
+                raise CompositionError(f"{self.role} is dead: pid={self.pid}")
             current = proc_fields(self.pid)
         except (ProcessLookupError, FileNotFoundError) as exc:
             raise CompositionError(f"{self.role} is dead: pid={self.pid}") from exc

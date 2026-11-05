@@ -162,6 +162,18 @@ class MetaflowTests(unittest.TestCase):
             finally:
                 replacement.close(); path.unlink()
 
+    def test_zombie_pidfd_identity_is_rejected(self):
+        proc = subprocess.Popen([shutil.which("sleep"), "30"])
+        identity = metaflow.ProcessIdentity.capture("owned", proc.pid, os.getpid(), os.getuid(), shutil.which("sleep"))
+        try:
+            with mock.patch("metaflow.proc_is_zombie", return_value=True):
+                with self.assertRaisesRegex(metaflow.CompositionError, "dead"):
+                    identity.verify()
+        finally:
+            identity.send(signal.SIGTERM)
+            proc.wait(timeout=2)
+            os.close(identity.pidfd)
+
     def test_dead_pidfd_identity_is_rejected(self):
         proc = subprocess.Popen([shutil.which("sleep"), "30"])
         identity = metaflow.ProcessIdentity.capture("owned", proc.pid, os.getpid(), os.getuid(), shutil.which("sleep"))
