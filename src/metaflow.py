@@ -412,7 +412,23 @@ class Composition:
         if not output.startswith("Listed."):
             raise CompositionError(f"Flow did not answer Definitions: {output}")
 
+    def _validate_start_configuration(self) -> None:
+        required = {
+            "herdr": ("pair", "pairExecutable", "daemonExecutable", "translatorExecutable",
+                      "metaCli", "herdr", "sockets", "readyDatoms", "peerDatom"),
+            "belief": ("pair", "pairExecutable", "daemonExecutable", "translatorExecutable",
+                       "cli", "metaCli", "sockets", "resolveDatom", "readyDatom", "peerDatom"),
+            "flow": ("pair", "pairExecutable", "daemonExecutable", "translatorExecutable",
+                     "cli", "sockets", "readyDatom"),
+        }
+        for component, fields in required.items():
+            missing = [field for field in fields if field not in self.config[component]]
+            if missing:
+                raise CompositionError(
+                    f"deployment configuration component {component} is missing: {', '.join(missing)}")
+
     def start(self) -> None:
+        self._validate_start_configuration()
         self.prepare_paths()
         self.start_pair("herdr")
         self.ready_herdr()

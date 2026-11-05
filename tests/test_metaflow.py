@@ -37,6 +37,12 @@ class MetaflowTests(unittest.TestCase):
                "XDG_STATE_HOME": str(Path(root) / "state")}
         return metaflow.Composition(base_config(root), "test", env, runner)
 
+    def test_start_reports_missing_component_fields(self):
+        with tempfile.TemporaryDirectory() as root:
+            composition = self.make(root)
+            with self.assertRaisesRegex(metaflow.CompositionError, "component herdr is missing: pair"):
+                composition.start()
+
     def test_deployment_configuration_shape_is_typed(self):
         with tempfile.TemporaryDirectory() as root:
             config = Path(root) / "shape.json"
