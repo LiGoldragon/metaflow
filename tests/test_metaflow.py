@@ -37,6 +37,15 @@ class MetaflowTests(unittest.TestCase):
                "XDG_STATE_HOME": str(Path(root) / "state")}
         return metaflow.Composition(base_config(root), "test", env, runner)
 
+    def test_deployment_configuration_shape_is_typed(self):
+        with tempfile.TemporaryDirectory() as root:
+            config = Path(root) / "shape.json"
+            config.write_text("[]")
+            with mock.patch.dict(os.environ, {"METAFLOW_DEPLOYMENT_CONFIG": str(config)}), \
+                 mock.patch("sys.stderr", new_callable=__import__("io").StringIO) as stderr:
+                self.assertEqual(metaflow.main(["start", "test"]), 1)
+            self.assertIn("must be an object", stderr.getvalue())
+
     def test_invalid_deployment_configuration_is_user_facing_error(self):
         with tempfile.TemporaryDirectory() as root:
             config = Path(root) / "broken.json"

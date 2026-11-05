@@ -144,6 +144,11 @@ class Pair:
 class Composition:
     def __init__(self, config: dict, name: str, environ: dict[str, str] | None = None,
                  runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run):
+        if not isinstance(config, dict):
+            raise CompositionError("deployment configuration must be an object")
+        for component in ("herdr", "belief", "flow"):
+            if not isinstance(config.get(component), dict):
+                raise CompositionError(f"deployment configuration component {component} must be an object")
         self.config = config
         self.name = name
         self.environ = dict(os.environ if environ is None else environ)
